@@ -1,0 +1,31 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"checksumSHA1": "gzYAE/UJ+G7yTqkdJAMActxDdxw=",
+			"path": "github.com/gorilla/mux",
+			"revision": "c0091a029979286890368b4c7b301261e448e242",
+			"revisionTime": "2018-01-20T07:58:19Z"
+		},
+		{
+			"checksumSHA1": "qkj3U5MdDGTA4l3Oce/Ffybso4g=",
+			"path": "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-grpc-gateway",
+			"revision": "58f78b988bc393694cef62b92c5cde77e4742ff5",
+			"revisionTime": "2018-03-12T00:19:38Z"
+		},
+		{
+			"checksumSHA1": "mHoZfSj8N2xYDIcQQZqEV+rG5DM=",
+			"path": "github.com/grpc-ecosystem/grpc-gateway/protoc-gen-swagger",
+			"revision": "58f78b988bc393694cef62b92c5cde77e4742ff5",
+			"revisionTime": "2018-03-12T00:19:38Z"
+		},
+		{
+			"checksumSHA1": "fjIVp6TfDdUlmCOyjrXTrk78saE=",
+			"path": "github.com/urfave/negroni",
+			"revision": "ff85fb036d90eda8518001242fcded1024e05c98",
+			"revisionTime": "2018-01-05T16:42:25Z"
+		}
+	],
+	"rootPath": "ninja"
+}
