@@ -31,6 +31,12 @@
 			"path": "github.com/urfave/negroni",
 			"revision": "ff85fb036d90eda8518001242fcded1024e05c98",
 			"revisionTime": "2018-01-05T16:42:25Z"
+		},
+		{
+			"checksumSHA1": "GtamqiJoL7PGHsN454AoffBFMa8=",
+			"path": "golang.org/x/net/context",
+			"revision": "d0aafc73d5cdc42264b0af071c261abac580695e",
+			"revisionTime": "2018-03-04T10:38:26Z"
 		}
 	],
 	"rootPath": "ninja"

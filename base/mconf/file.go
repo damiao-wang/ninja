@@ -14,6 +14,15 @@ var (
 	flagOnce sync.Once
 )
 
+func ReadFile(obj interface{}) error {
+	data, err := ioutil.ReadFile(defatultConf)
+	if err != nil {
+		log.Printf("ReadFile, error: %v", err)
+		return err
+	}
+	return Unmarshal(data, obj)
+}
+
 func ByFlagOnce(obj interface{}) {
 	flagOnce.Do(func() {
 		err := ReadFile(obj)
@@ -25,13 +34,11 @@ func ByFlagOnce(obj interface{}) {
 	return
 }
 
-func ReadFile(obj interface{}) error {
-	data, err := ioutil.ReadFile(defatultConf)
+func ByFlag(obj interface{}) {
+	err := ReadFile(obj)
 	if err != nil {
-		log.Printf("ReadFile, error: %v", err)
-		return err
+		panic(err)
 	}
-	return Unmarshal(data, obj)
 }
 
 func Unmarshal(data []byte, obj interface{}) error {
