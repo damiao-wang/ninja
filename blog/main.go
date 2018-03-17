@@ -9,8 +9,8 @@ import (
 
 func main() {
 	r := gin.Default()
-	s := &server.Service{}
-	r.POST("/api/blog/Hello", s.Hello)
 	router.AutoRouter(r, &server.Service{})
-	r.Run("8080")
+	// r.Run(":8080")
+	//r.POST("/api/blog/Hello", s.Hello)
+	r.Run(":8080")
 }

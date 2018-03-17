@@ -2,20 +2,21 @@ package router
 
 import (
 	"fmt"
+	"os"
 	"reflect"
-
-	"ninja/base/misc/stack"
 
 	"github.com/gin-gonic/gin"
 )
 
 func AutoRouter(r *gin.Engine, s interface{}) {
-	reflectVal := reflect.ValueOf(s)
-	rt := reflectVal.Type()
-	ct := reflect.Indirect(reflectVal).Type()
-	prefix := fmt.Sprintf("/api/%v", stack.PkgName(0))
-	fmt.Println("prefix: ", prefix)
-	for i := 0; i < rt.NumMethod(); i++ {
-		r.POST(fmt.Sprintf("%v/%v", prefix, ct.Method(i).Name), rt.Method(i).Func.Interface().(gin.HandlerFunc))
+	g := r.Group(fmt.Sprintf("/api/blog"))
+	fmt.Println(os.Args[0])
+	vf := reflect.ValueOf(s)
+	for i := 0; i < vf.NumMethod(); i++ {
+		func(idx int) {
+			g.POST(fmt.Sprintf("/%v", vf.Type().Method(idx).Name), func(c *gin.Context) {
+				vf.Method(idx).Call([]reflect.Value{reflect.ValueOf(c)})
+			})
+		}(i)
 	}
 }

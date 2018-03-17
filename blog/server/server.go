@@ -6,14 +6,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Service struct{}
+type Service struct {
+	Name string
+}
 
 func (s *Service) Hello(ctx *gin.Context) {
-	name := ctx.PostForm("name")
+	var name string = "wang jihang "
 	ctx.String(http.StatusOK, "Hello %v.", name)
 }
 
 func (s *Service) Bye(ctx *gin.Context) {
-	name := ctx.PostForm("name")
+	name, _ := ctx.Get("name")
 	ctx.String(http.StatusOK, "Bye %v.", name)
 }
+
+type Handler func(*gin.Context, HelloReq) (HelloResp, error)
