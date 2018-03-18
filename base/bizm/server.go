@@ -3,14 +3,17 @@ package bizm
 import (
 	"net"
 	"strconv"
+
 	"gitlab.1dmy.com/ezbuy/base/misc/errors"
+	"golang.org/x/net/context"
 )
 
-type Service struct {
+type Server struct {
 	Port int
+	WebServer
 }
 
-func (s *Service) Init(srv interface{}, pkg string, register func() error) error {
+func (s *Server) Init(srv interface{}, pkg string, register func() error) error {
 	if err := SetPortByName(pkg, s); err != nil {
 		return errors.Trace(err)
 	}
@@ -21,7 +24,7 @@ func (s *Service) Init(srv interface{}, pkg string, register func() error) error
 	return nil
 }
 
-func (s *Service) SetPort(addr string) error {
+func (s *Server) SetPort(addr string) error {
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return errors.Trace(err)
@@ -34,6 +37,10 @@ func (s *Service) SetPort(addr string) error {
 	return nil
 }
 
-func (s *Service) Close() error {
+func (s *Server) Run(ctx context.Context) error {
+	return s.WebServer.Serve(s.Port)
+}
+
+func (s *Server) Close() error {
 	return nil
 }

@@ -1,2 +1,2 @@
 [listen_addrs]
-    "service article" = ":14345"
+    "service article" = ":1234"

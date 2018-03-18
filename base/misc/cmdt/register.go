@@ -3,18 +3,11 @@ package cmdt
 import (
 	"reflect"
 	"path"
-	"fmt"
-	"net/http"
-	"time"
 	"ninja/base/misc/stack"
 	"github.com/spf13/cobra"
-	"github.com/gorilla/mux"
-	"ninja/base/misc/router"
-	"github.com/urfave/negroni"
 	"log"
-	"os/signal"
 	"os"
-	"syscall"
+	"golang.org/x/net/context"
 )
 
 var RootCmd = &cobra.Command{
@@ -50,7 +43,7 @@ func GetServiceName(s interface{}) string {
 type Servicer interface {
 	Register() error
 	Desc() string
-	// Run(ctx context.Context) error
+	Run(ctx context.Context) error
 	Close() error
 }
 
@@ -88,45 +81,17 @@ func registerServicer(s Servicer) error {
 	return s.Register()
 }
 
-func registerServiceEx(name, desc string, s interface{}) *cobra.Command {
+func registerServiceEx(name, desc string, s Servicer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   name,
 		Short: desc,
 		Run: func(c *cobra.Command, args []string) {
-			if err := registerServicer(s.(Servicer)); err != nil {
+			defer s.Close()
+			if err := registerServicer(s); err != nil {
 				log.Println(err)
 				return
 			}
-			r := mux.NewRouter().Path(fmt.Sprintf("/api/name")).Subrouter()
-			router.AutoRouter(r, s)
-			n := negroni.Classic()
-			n.UseHandler(r)
-			
-			srv := &http.Server{
-				Addr: ":8080",
-				Handler: n,
-				ReadTimeout:    10 * time.Second,
-				WriteTimeout:   10 * time.Second,
-				MaxHeaderBytes: 1 << 20,
-			}
-		
-			go func() {
-				log.Println(srv.ListenAndServe())
-				log.Println("server shutdown")
-			}()
-		
-			// Handle SIGINT and SIGTERM.
-			ch := make(chan os.Signal)
-			signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-			log.Println(<-ch)
-		
-			// Stop the service gracefully.
-			log.Println(srv.Shutdown(nil))
-			s.(Servicer).Close()
-		
-			// Wait gorotine print shutdown message
-			time.Sleep(time.Second * 5)
-			log.Println("done.")
+			s.Run(context.Background())
 			return
 		},
 	}

@@ -1,7 +1,5 @@
 package bizm
 
-
-
 import (
 	"fmt"
 
