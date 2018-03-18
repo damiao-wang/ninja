@@ -2,10 +2,15 @@ package stack
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"ninja/base/misc/svsb"
+
+	raven "github.com/getsentry/raven-go"
 )
 
 func PkgName(depth int) string {
@@ -13,7 +18,6 @@ func PkgName(depth int) string {
 	if !ok {
 		return ""
 	}
-	fmt.Println("path: ", runtime.FuncForPC(pc).Name())
 	fp := filepath.Base(runtime.FuncForPC(pc).Name())
 	return strings.Split(fp, ".")[0]
 }
@@ -41,6 +45,57 @@ func All() string {
 		n.WriteString(";")
 	}
 	return n.String()
+}
+
+type Frame struct {
+	Name  string
+	Frame *raven.StacktraceFrame
+}
+
+func GetAllFrame(skip int) (ret []*Frame) {
+	for i := skip + 1; ; i++ {
+		item := GetFrame(i)
+		if item == nil {
+			break
+		}
+		if item.Frame == nil {
+			break
+		}
+		if strings.HasPrefix(item.Name, "runtime.") {
+			continue
+		}
+		ret = append(ret, item)
+	}
+	return ret
+}
+
+func GetFrame(skip int) *Frame {
+	pc, file, line, ok := runtime.Caller(1 + skip)
+	if !ok {
+		return nil
+	}
+	return &Frame{
+		Name: fmt.Sprintf("%v:%v",
+			filepath.Base(runtime.FuncForPC(pc).Name()), line),
+		Frame: raven.NewStacktraceFrame(pc, file, line, 4, nil),
+	}
+}
+
+func FramesUnmarshal(data []string) (ret []*Frame, err error) {
+	if len(data) == 0 {
+		return nil, nil
+	}
+	err = json.Unmarshal(svsb.Bytes(data[0]), &ret)
+	return
+}
+
+func FramesMarshal(fs []*Frame) string {
+	bty, _ := json.Marshal(fs)
+	return svsb.String(bty)
+}
+
+func (f *Frame) String() string {
+	return f.Name
 }
 
 type Fields map[string]interface{}
