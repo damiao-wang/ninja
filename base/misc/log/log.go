@@ -3,6 +3,7 @@ package log
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -31,13 +32,14 @@ func SetErrorHandler(f func(err error, depth int)) {
 
 func NewEx(depth int) *Entry {
 	logger := logrus.New()
-	disableColor := os.Getenv("TERM") == "dumb"
+	disableColor := os.Getenv("LOGCOLOR") == "false"
 	if !disableColor {
 		disableColor = os.Getenv("NOCOLOR") != ""
 	}
 	logger.Formatter = &logrus.TextFormatter{
 		DisableColors: disableColor,
 	}
+
 	return &Entry{
 		Entry: logrus.NewEntry(logger),
 		depth: depth,
@@ -143,6 +145,10 @@ func (e *Entry) ErrorMsg(args ...interface{}) {
 	e.Entry.WithField("call", stack.String(e.depth+1)).Error(args...)
 }
 
+func (e *Entry) SetOut(w io.Writer) {
+	e.Entry.Logger.Out = w
+}
+
 // -----------------------------------------------------------------------------
 
 type Fielder interface {
@@ -222,4 +228,8 @@ func Struct(obj ...interface{}) {
 func JSON(obj interface{}) {
 	ret, _ := json.MarshalIndent(obj, "", "\t")
 	fmt.Println(string(ret))
+}
+
+func SetOut(w io.Writer) {
+	std.SetOut(w)
 }

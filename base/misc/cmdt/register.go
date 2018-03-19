@@ -1,12 +1,14 @@
 package cmdt
 
 import (
-	"reflect"
-	"path"
-	"ninja/base/misc/stack"
-	"github.com/spf13/cobra"
 	"log"
+	"ninja/base/mconf"
+	"ninja/base/misc/stack"
 	"os"
+	"path"
+	"reflect"
+
+	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
 
@@ -21,6 +23,10 @@ var ServiceCmd = &cobra.Command{
 
 func SetName(name string) {
 	RootCmd.Short = name
+}
+
+func init() {
+	mconf.ParseFlag(RootCmd.PersistentFlags())
 }
 
 func Execute() error {

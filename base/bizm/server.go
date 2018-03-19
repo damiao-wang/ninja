@@ -1,21 +1,18 @@
 package bizm
 
 import (
-	"net"
-	"strconv"
-
 	"ninja/base/misc/errors"
 
 	"golang.org/x/net/context"
 )
 
 type Server struct {
-	Port int
+	Conf *Config
 	WebServer
 }
 
 func (s *Server) Init(srv interface{}, pkg string, register func() error) error {
-	if err := SetPortByName(pkg, s); err != nil {
+	if err := s.Conf.Init(pkg); err != nil {
 		return errors.Trace(err)
 	}
 	if err := register(); err != nil {
@@ -25,23 +22,10 @@ func (s *Server) Init(srv interface{}, pkg string, register func() error) error 
 	return nil
 }
 
-func (s *Server) SetPort(addr string) error {
-	_, port, err := net.SplitHostPort(addr)
-	if err != nil {
-		return errors.Trace(err)
-	}
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		return errors.Trace(err)
-	}
-	s.Port = portInt
-	return nil
-}
-
 func (s *Server) Run(ctx context.Context) error {
-	return s.WebServer.Serve(s.Port)
+	return s.WebServer.Serve(s.Conf.Port)
 }
 
 func (s *Server) Close() error {
-	return nil
+	return s.Conf.Close()
 }

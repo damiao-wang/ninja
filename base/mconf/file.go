@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/BurntSushi/toml"
+	"github.com/spf13/pflag"
 )
 
 var (
@@ -47,4 +48,19 @@ func Unmarshal(data []byte, obj interface{}) error {
 		return err
 	}
 	return nil
+}
+
+func ParseFlag(p *pflag.FlagSet) {
+	hasConf := false
+	p.VisitAll(func(f *pflag.Flag) {
+		if f.Name == "conf" {
+			hasConf = true
+		}
+		if f.Shorthand == "c" {
+			hasConf = true
+		}
+	})
+	if !hasConf {
+		p.StringVarP(&defatultConf, "conf", "c", defatultConf, "ctmpl path")
+	}
 }
