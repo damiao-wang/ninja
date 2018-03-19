@@ -4,7 +4,7 @@ import (
 	"ninja/base/bizm"
 )
 
-type Service struct{
+type Service struct {
 	bizm.Server
 }
 

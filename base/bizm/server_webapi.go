@@ -1,12 +1,13 @@
 package bizm
 
-import(
-	"fmt"
-	"reflect"
-	"net/http"
-	"io/ioutil"
+import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 	"path"
+	"reflect"
+
 	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
 	"golang.org/x/net/context"
@@ -41,9 +42,9 @@ func (s *WebServer) AutoRouter(c interface{}) {
 	vf := reflect.ValueOf(c)
 	ctx := context.Background()
 	for i := 0; i < vf.NumMethod(); i++ {
-		func (i int)  {
+		func(i int) {
 			path := fmt.Sprintf("/api/%v/%v", serviceName, vf.Type().Method(i).Name)
-			s.mux.HandleFunc(path, generateHandler(ctx,vf.Method(i))).Methods("POST")
+			s.mux.HandleFunc(path, generateHandler(ctx, vf.Method(i))).Methods("POST")
 		}(i)
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"ninja/base/mconf"
-	"gitlab.1dmy.com/ezbuy/base/misc/errors"
+	"ninja/base/misc/errors"
 )
 
 type Portor interface {

@@ -4,7 +4,8 @@ import (
 	"net"
 	"strconv"
 
-	"gitlab.1dmy.com/ezbuy/base/misc/errors"
+	"ninja/base/misc/errors"
+
 	"golang.org/x/net/context"
 )
 
