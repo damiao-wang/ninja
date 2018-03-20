@@ -2,6 +2,7 @@ package article
 
 import (
 	"ninja/base/bizm"
+	pb "ninja/blog/rpc/blog"
 )
 
 type Service struct {
@@ -13,6 +14,6 @@ func (s *Service) Desc() string {
 }
 
 func (s *Service) Register() error {
-	s.AutoRouter(&Controller{})
+	s.RegisterServer(&Controller{}, pb.RegisterArticleServer)
 	return nil
 }

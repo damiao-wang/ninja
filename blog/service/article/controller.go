@@ -3,22 +3,16 @@ package article
 import (
 	"fmt"
 
+	pb "ninja/blog/rpc/blog"
+
 	"golang.org/x/net/context"
 )
 
 type Controller struct{}
 
-type HelloReq struct {
-	Name string
-}
-
-type HelloResp struct {
-	Msg string
-}
-
-func (c *Controller) Hello(ctx context.Context, req HelloReq) (*HelloResp, error) {
+func (c *Controller) Hello(ctx context.Context, req *pb.HelloReq) (*pb.HelloResp, error) {
 	msg := fmt.Sprintf("Hello %v.", req.Name)
-	return &HelloResp{
+	return &pb.HelloResp{
 		Msg: msg,
 	}, nil
 }

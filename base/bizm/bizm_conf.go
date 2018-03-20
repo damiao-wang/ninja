@@ -60,5 +60,8 @@ func (c *Config) SetPort(addr string) error {
 }
 
 func (c *Config) Close() error {
-	return c.logFiler.Close()
+	if c.logFiler != nil {
+		return c.logFiler.Close()
+	}
+	return nil
 }
