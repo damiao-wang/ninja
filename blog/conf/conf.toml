@@ -2,3 +2,4 @@
 
 [listen_addrs]
     "service article" = ":1234"
+    "grpc article" = ":1235"

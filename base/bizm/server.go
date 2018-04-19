@@ -2,7 +2,6 @@ package bizm
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"reflect"
@@ -31,12 +30,9 @@ func (s *Server) Init(srv interface{}, pkg string, register func() error) error 
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%v", s.Conf.Port))
-	if err != nil {
-		return err
-	}
-	go s.GrpcServer.Serve(ln)
-	go s.WebServer.Serve(ln)
+	go s.GrpcServer.Serve(fmt.Sprintf(":%v", s.Conf.GrpcPort))
+	go s.WebServer.Serve(fmt.Sprintf(":%v", s.Conf.WebPort))
+
 	done := make(chan os.Signal)
 	signal.Notify(done, os.Interrupt, os.Kill)
 	<-done
