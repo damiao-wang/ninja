@@ -47,6 +47,7 @@ func (s *WebServer) AutoRouter(c interface{}) {
 	for i := 0; i < vf.NumMethod(); i++ {
 		func(i int) {
 			path := fmt.Sprintf("/api/%v/%v", serviceName, vf.Type().Method(i).Name)
+			fmt.Println("path: ", path)
 			s.mux.HandleFunc(path, generateHandler(ctx, vf.Method(i))).Methods("POST")
 		}(i)
 	}
