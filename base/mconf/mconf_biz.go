@@ -12,6 +12,7 @@ const (
 )
 
 type BaseConfig struct {
+	Pkg         string            `toml:"pkg"`
 	RunMode     string            `toml:"run_mode"`
 	ListenAddrs map[string]string `toml:"listen_addrs"`
 }
@@ -35,4 +36,12 @@ func GetRunMode() string {
 		return DEV
 	}
 	return initBaseConfig().RunMode
+}
+
+func GetPkgName() string {
+	if initBaseConfig().Pkg == "" {
+		panic("配置文件必须包含pkg字段.")
+	}
+
+	return initBaseConfig().Pkg
 }

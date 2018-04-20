@@ -1,3 +1,4 @@
+"pkg" = "blog"
 "run_mode" = "dev"
 
 [listen_addrs]

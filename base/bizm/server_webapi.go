@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"ninja/base/mconf"
 	"path"
 	"reflect"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
@@ -39,14 +41,13 @@ func (s *WebServer) AutoRouter(c interface{}) {
 		s.mux = mux.NewRouter()
 	}
 
-	serviceName := getServiceName(c)
+	pathPrefix := fmt.Sprintf("/api/%s.%s", mconf.GetPkgName(), getServiceName(c))
+	subRouter := s.mux.PathPrefix(pathPrefix).Subrouter()
 	vf := reflect.ValueOf(c)
 	ctx := context.Background()
 	for i := 0; i < vf.NumMethod(); i++ {
 		func(i int) {
-			path := fmt.Sprintf("/api/%v/%v", serviceName, vf.Type().Method(i).Name)
-			fmt.Println("path: ", path)
-			s.mux.HandleFunc(path, generateHandler(ctx, vf.Method(i))).Methods("POST")
+			subRouter.HandleFunc(fmt.Sprintf("/%v", vf.Type().Method(i).Name), generateHandler(ctx, vf.Method(i))).Methods("POST")
 		}(i)
 	}
 }
@@ -98,5 +99,8 @@ func getServiceName(s interface{}) string {
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	return path.Base(t.PkgPath())
+
+	name := path.Base(t.PkgPath())
+	first := strings.ToUpper(string(name[0]))
+	return first + name[1:]
 }

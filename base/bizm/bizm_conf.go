@@ -20,24 +20,25 @@ type Config struct {
 	logFiler io.WriteCloser
 }
 
-func (c *Config) Init(pkgName string) error {
+func (c *Config) Init(srvName string) error {
+	pkgName := mconf.GetPkgName()
 	c.RunMode = mconf.GetRunMode()
 	if c.RunMode == mconf.PROD {
 		log.SetLevel("INFO")
 		c.logFiler = &lumberjack.Logger{
-			Filename:   fmt.Sprintf("/var/logs/%v.log", pkgName),
+			Filename:   fmt.Sprintf("/var/logs/%v/%v.log", pkgName, srvName),
 			MaxAge:     30,
 			MaxBackups: 5,
 		}
 		log.SetOut(c.logFiler)
 	}
-	return c.setPortByName(pkgName)
+	return c.setPortByName(srvName)
 }
 
-func (c *Config) setPortByName(pkgName string) error {
+func (c *Config) setPortByName(srvName string) error {
 	data := mconf.GetListenAddrs()
-	webKey := fmt.Sprintf("service %v", pkgName)
-	grpcKey := fmt.Sprintf("grpc %v", pkgName)
+	webKey := fmt.Sprintf("service %v", srvName)
+	grpcKey := fmt.Sprintf("grpc %v", srvName)
 
 	if v, ok := data[webKey]; ok {
 		port, err := c.GetPortInt(v)
@@ -56,7 +57,7 @@ func (c *Config) setPortByName(pkgName string) error {
 	}
 
 	if c.WebPort == 0 || c.GrpcPort == 0 {
-		return errors.Fmt(`port of "service:%v" is not found`, pkgName)
+		return errors.Fmt(`port of "service:%v" is not found`, srvName)
 	}
 
 	return nil

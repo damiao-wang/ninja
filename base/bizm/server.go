@@ -17,9 +17,9 @@ type Server struct {
 	WebServer
 }
 
-func (s *Server) Init(srv interface{}, pkg string, register func() error) error {
+func (s *Server) Init(srv interface{}, srvName string, register func() error) error {
 	s.Conf = &Config{}
-	if err := s.Conf.Init(pkg); err != nil {
+	if err := s.Conf.Init(srvName); err != nil {
 		return errors.Trace(err)
 	}
 	if err := register(); err != nil {
