@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	Addr = "localhost:1235"
+	Addr = "localhost:1234"
 )
 
 func main() {

@@ -14,8 +14,7 @@ import (
 )
 
 type Config struct {
-	WebPort  int
-	GrpcPort int
+	Port     int
 	RunMode  string
 	logFiler io.WriteCloser
 }
@@ -37,42 +36,27 @@ func (c *Config) Init(srvName string) error {
 
 func (c *Config) setPortByName(srvName string) error {
 	data := mconf.GetListenAddrs()
-	webKey := fmt.Sprintf("service %v", srvName)
-	grpcKey := fmt.Sprintf("grpc %v", srvName)
+	srvKey := fmt.Sprintf("service %v", srvName)
 
-	if v, ok := data[webKey]; ok {
-		port, err := c.GetPortInt(v)
-		if err != nil {
-			return errors.Trace(err)
-		}
-		c.WebPort = port
+	if v, ok := data[srvKey]; ok {
+		return c.SetPortInt(v)
 	}
 
-	if v, ok := data[grpcKey]; ok {
-		port, err := c.GetPortInt(v)
-		if err != nil {
-			return errors.Trace(err)
-		}
-		c.GrpcPort = port
-	}
-
-	if c.WebPort == 0 || c.GrpcPort == 0 {
-		return errors.Fmt(`port of "service:%v" is not found`, srvName)
-	}
-
-	return nil
+	return errors.Fmt(`port of "service %v" is not found`, srvName)
 }
 
-func (c *Config) GetPortInt(addr string) (int, error) {
+func (c *Config) SetPortInt(addr string) error {
 	_, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		return 0, errors.Trace(err)
+		return errors.Trace(err)
 	}
 	portInt, err := strconv.Atoi(port)
 	if err != nil {
-		return 0, errors.Trace(err)
+		return errors.Trace(err)
 	}
-	return portInt, nil
+
+	c.Port = portInt
+	return nil
 }
 
 func (c *Config) Close() error {

@@ -2,12 +2,12 @@ package bizm
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
+	"net"
 	"reflect"
 
 	"ninja/base/misc/errors"
 
+	"github.com/soheilhy/cmux"
 	"golang.org/x/net/context"
 )
 
@@ -30,13 +30,27 @@ func (s *Server) Init(srv interface{}, srvName string, register func() error) er
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	go s.GrpcServer.Serve(fmt.Sprintf(":%v", s.Conf.GrpcPort))
-	go s.WebServer.Serve(fmt.Sprintf(":%v", s.Conf.WebPort))
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%v", s.Conf.Port))
+	if err != nil {
+		errors.Trace(err)
+	}
 
-	done := make(chan os.Signal)
-	signal.Notify(done, os.Interrupt, os.Kill)
-	<-done
-	return nil
+	m := cmux.New(ln)
+	// start grpc
+	{
+		match := cmux.HTTP2HeaderField("content-type", "application/grpc")
+		ln := m.Match(match)
+		go s.GrpcServer.Serve(ln)
+
+	}
+
+	// start webapi
+	{
+		ln := m.Match(cmux.Any())
+		go s.WebServer.Serve(ln)
+	}
+
+	return m.Serve()
 }
 
 func (s *Server) Close() error {

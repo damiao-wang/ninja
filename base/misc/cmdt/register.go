@@ -1,7 +1,6 @@
 package cmdt
 
 import (
-	"log"
 	"ninja/base/mconf"
 	"ninja/base/misc/stack"
 	"os"
@@ -94,10 +93,11 @@ func registerServiceEx(name, desc string, s Servicer) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			defer s.Close()
 			if err := registerServicer(s); err != nil {
-				log.Println(err)
-				return
+				panic(err)
 			}
-			s.Run(context.Background())
+			if err := s.Run(context.Background()); err != nil {
+				panic(err)
+			}
 			return
 		},
 	}

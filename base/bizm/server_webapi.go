@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"ninja/base/mconf"
 	"path"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
@@ -24,16 +26,21 @@ func (s *WebServer) AddMiddleware(m ...negroni.Handler) {
 	s.middleware = append(s.middleware, m...)
 }
 
-func (s *WebServer) Serve(addr string) error {
+func (s *WebServer) Serve(ln net.Listener) error {
 	if s.mux == nil {
 		s.mux = mux.NewRouter()
 	}
 
 	n := negroni.Classic().With(s.middleware...)
 	n.UseHandler(s.mux)
-	n.Run(addr)
+	srv := http.Server{
+		Handler:        n,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
 
-	return nil
+	return srv.Serve(ln)
 }
 
 func (s *WebServer) AutoRouter(c interface{}) {
