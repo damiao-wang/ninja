@@ -6,11 +6,13 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"ninja/base/mconf"
 	"path"
 	"reflect"
 	"strings"
 	"time"
+
+	"ninja/base/mconf"
+	"ninja/base/misc/log"
 
 	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
@@ -26,12 +28,13 @@ func (s *WebServer) AddMiddleware(m ...negroni.Handler) {
 	s.middleware = append(s.middleware, m...)
 }
 
-func (s *WebServer) Serve(ln net.Listener) error {
+func (s *WebServer) Serve(ln net.Listener) {
 	if s.mux == nil {
 		s.mux = mux.NewRouter()
 	}
 
-	n := negroni.Classic().With(s.middleware...)
+	n := negroni.Classic()
+	n.With(s.middleware...)
 	n.UseHandler(s.mux)
 	srv := http.Server{
 		Handler:        n,
@@ -40,7 +43,60 @@ func (s *WebServer) Serve(ln net.Listener) error {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	return srv.Serve(ln)
+	log.Infof("server HTTP start. Listen: %v", ln.Addr())
+	log.Errorf("err: %v", srv.Serve(ln))
+}
+
+func (s *WebServer) RegisterRouter(mux *mux.Router) {
+	if mux != nil {
+		s.mux = mux
+	}
+}
+
+func (s *WebServer) GenHTTPHandler(fn interface{}) http.HandlerFunc {
+	fnVal := reflect.ValueOf(fn)
+	fnType := fnVal.Type()
+	if fnType.Kind() != reflect.Func {
+		panic("fnVal is not a func.") // TODO
+	}
+	if fnType.NumIn() != 2 {
+		panic("Num of input param isn't equal 2!") // TODO
+	}
+	if fnType.NumOut() != 2 {
+		panic("Num of output param isn't equal 2!") // TODO
+	}
+
+	if fnType.Out(1).Name() != "error" {
+		panic("The 2th output param must be error.") // TODO
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestBody, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			errorEncoder(err, w)
+			return
+		}
+		in := reflect.New(fnType.In(1))
+		err = json.Unmarshal(requestBody, in.Interface())
+		if err != nil {
+			errorEncoder(err, w)
+			return
+		}
+		vals := fnVal.Call([]reflect.Value{
+			reflect.ValueOf(context.Background()),
+			in.Elem(),
+		})
+		if !vals[1].IsNil() {
+			errorEncoder(vals[1].Interface().(error), w)
+			return
+		}
+		data, err := json.Marshal(vals[0].Interface())
+		if err != nil {
+			errorEncoder(err, w)
+			return
+		}
+		w.Write(data)
+	}
 }
 
 func (s *WebServer) AutoRouter(c interface{}) {
@@ -110,4 +166,14 @@ func getServiceName(s interface{}) string {
 	name := path.Base(t.PkgPath())
 	first := strings.ToUpper(string(name[0]))
 	return first + name[1:]
+}
+
+func errorEncoder(err error, w http.ResponseWriter) {
+	w.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(w).Encode(errorWrapper{Error: err.Error()})
+	log.NewEx(1).Errorf("err: %v", err)
+}
+
+type errorWrapper struct {
+	Error string `json:"error"`
 }

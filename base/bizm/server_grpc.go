@@ -2,6 +2,7 @@ package bizm
 
 import (
 	"net"
+	"ninja/base/misc/log"
 
 	"google.golang.org/grpc"
 )
@@ -11,7 +12,7 @@ type GrpcServer struct {
 }
 
 func (s *GrpcServer) Serve(ln net.Listener) {
-	s.GetServer().Serve(ln)
+	log.Errorf("err: %v", s.GetServer().Serve(ln))
 }
 
 func (s *GrpcServer) GetServer() *grpc.Server {

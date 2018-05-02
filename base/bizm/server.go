@@ -3,7 +3,6 @@ package bizm
 import (
 	"fmt"
 	"net"
-	"reflect"
 
 	"ninja/base/misc/errors"
 
@@ -57,16 +56,16 @@ func (s *Server) Close() error {
 	return s.Conf.Close()
 }
 
-func (s *Server) RegisterServer(controller, grpcRegister interface{}) {
-	s.AutoRouter(controller)
-	fnVal := reflect.ValueOf(grpcRegister)
-	fnType := fnVal.Type()
-	if fnType.Kind() != reflect.Func {
-		panic("grpcRegister must be a func.")
-	}
-	grpcServer := s.GetServer()
-	fnVal.Call([]reflect.Value{
-		reflect.ValueOf(grpcServer),
-		reflect.ValueOf(controller),
-	})
-}
+// func (s *Server) RegisterServer(controller, grpcRegister interface{}) {
+// 	s.AutoRouter(controller)
+// 	fnVal := reflect.ValueOf(grpcRegister)
+// 	fnType := fnVal.Type()
+// 	if fnType.Kind() != reflect.Func {
+// 		panic("grpcRegister must be a func.")
+// 	}
+// 	grpcServer := s.GetServer()
+// 	fnVal.Call([]reflect.Value{
+// 		reflect.ValueOf(grpcServer),
+// 		reflect.ValueOf(controller),
+// 	})
+// }

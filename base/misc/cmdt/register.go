@@ -1,11 +1,13 @@
 package cmdt
 
 import (
-	"ninja/base/mconf"
-	"ninja/base/misc/stack"
 	"os"
 	"path"
 	"reflect"
+
+	"ninja/base/mconf"
+	"ninja/base/misc/log"
+	"ninja/base/misc/stack"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
@@ -93,10 +95,14 @@ func registerServiceEx(name, desc string, s Servicer) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			defer s.Close()
 			if err := registerServicer(s); err != nil {
-				panic(err)
+				log.Error(err)
+				return
 			}
-			if err := s.Run(context.Background()); err != nil {
-				panic(err)
+
+			err := s.Run(context.Background())
+			if err != nil {
+				log.Error(err)
+				os.Exit(1)
 			}
 			return
 		},
