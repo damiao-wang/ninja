@@ -14,6 +14,8 @@ import (
 
 	"ninja/base/mconf"
 	"ninja/base/misc/context"
+	"ninja/base/misc/errors"
+	"ninja/base/misc/grace"
 	"ninja/base/misc/log"
 
 	"github.com/gorilla/mux"
@@ -21,6 +23,7 @@ import (
 )
 
 type WebServer struct {
+	srv        *http.Server
 	mux        *mux.Router
 	middleware []negroni.Handler
 	IsDownload bool
@@ -44,15 +47,17 @@ func (s *WebServer) Serve(ln net.Listener) {
 	n := negroni.Classic()
 	n.With(s.middleware...)
 	n.UseHandler(s.mux)
-	srv := http.Server{
+	s.srv = &http.Server{
 		Handler:        n,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 
+	grace.CountInTask()
 	log.Infof("server HTTP start. Listen: %v", ln.Addr())
-	log.Errorf("err: %v", srv.Serve(ln))
+	s.srv.Serve(ln)
+	return
 }
 
 func (s *WebServer) RegisterRouter(mux *mux.Router) {
@@ -169,6 +174,33 @@ func (s *WebServer) AutoRouter(c interface{}) {
 	}
 }
 
+func (s *WebServer) Close() error {
+	err := s.srv.Shutdown(nil)
+	grace.DoneTask()
+	return errors.Trace(err)
+}
+
+func getServiceName(s interface{}) string {
+	t := reflect.TypeOf(s)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	name := path.Base(t.PkgPath())
+	first := strings.ToUpper(string(name[0]))
+	return first + name[1:]
+}
+
+func errorEncoder(err error, w http.ResponseWriter) {
+	w.WriteHeader(http.StatusInternalServerError)
+	json.NewEncoder(w).Encode(errorWrapper{Error: err.Error()})
+	log.NewEx(-1).Error(err)
+}
+
+type errorWrapper struct {
+	Error string `json:"error"`
+}
+
 func generateHandler(ctx context.Context, fnVal reflect.Value) http.HandlerFunc {
 	fnType := fnVal.Type()
 	if fnType.Kind() != reflect.Func {
@@ -209,25 +241,4 @@ func generateHandler(ctx context.Context, fnVal reflect.Value) http.HandlerFunc 
 		}
 		writer.Write(data)
 	}
-}
-
-func getServiceName(s interface{}) string {
-	t := reflect.TypeOf(s)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-
-	name := path.Base(t.PkgPath())
-	first := strings.ToUpper(string(name[0]))
-	return first + name[1:]
-}
-
-func errorEncoder(err error, w http.ResponseWriter) {
-	w.WriteHeader(http.StatusInternalServerError)
-	json.NewEncoder(w).Encode(errorWrapper{Error: err.Error()})
-	log.NewEx(-1).Error(err)
-}
-
-type errorWrapper struct {
-	Error string `json:"error"`
 }

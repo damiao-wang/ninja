@@ -2,15 +2,18 @@ package cmdt
 
 import (
 	"os"
+	"os/signal"
 	"path"
 	"reflect"
+	"syscall"
 
 	"ninja/base/mconf"
-	"ninja/base/misc/log"
+	"ninja/base/misc/context"
+	"ninja/base/misc/grace"
 	"ninja/base/misc/stack"
+	"ninja/base/trace/sentry"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/net/context"
 )
 
 var RootCmd = &cobra.Command{
@@ -50,7 +53,7 @@ func GetServiceName(s interface{}) string {
 type Servicer interface {
 	Register() error
 	Desc() string
-	Run(ctx context.Context) error
+	Run(ctx context.T) error
 	Close() error
 }
 
@@ -93,19 +96,55 @@ func registerServiceEx(name, desc string, s Servicer) *cobra.Command {
 		Use:   name,
 		Short: desc,
 		Run: func(c *cobra.Command, args []string) {
-			defer s.Close()
+			ctx, cf := context.WithCancel(context.Dump())
 			if err := registerServicer(s); err != nil {
-				log.Error(err)
+				ctx.LogErrorEx(1, err)
 				return
 			}
 
-			err := s.Run(context.Background())
-			if err != nil {
-				log.Error(err)
-				os.Exit(1)
-			}
+			// 捕获退出信号，gracefull退出
+			catchSignal(cf)
+
+			var err error
+			sentry.CapturePanicEx(0, "", func() {
+				err = s.Run(ctx)
+				s.Close()
+				grace.WaitTaskDone()
+				if err != nil {
+					ctx.LogErrorEx(1, err)
+					os.Exit(1)
+				}
+			}, nil)
+
 			return
 		},
 	}
 	return cmd
+}
+
+// cf 是在响应退出信号时必须要执行的
+func catchSignal(cf func()) {
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan)
+	go func() {
+		var exitSignalCount int
+		for {
+			select {
+			case s := <-signalChan:
+				switch s {
+				case os.Interrupt, syscall.SIGTERM, syscall.SIGHUP:
+					exitSignalCount++
+					if exitSignalCount > 1 {
+						context.LogInfo("force exit")
+						os.Exit(1)
+					}
+					grace.ExitMark()
+					cf()
+				default:
+
+				}
+			}
+		}
+	}()
+
 }

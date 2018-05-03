@@ -1,11 +1,10 @@
 package article
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"ninja/base/bizm"
-	nerrors "ninja/base/misc/errors"
+	"ninja/base/misc/context"
+	"ninja/base/misc/errors"
 	pb "ninja/blog/rpc/blog"
 )
 
@@ -23,9 +22,9 @@ func (s *Service) Register() error {
 	return nil
 }
 
-func (s *Service) Hello(ctx context.Context, req *pb.HelloReq) (*pb.HelloResp, error) {
+func (s *Service) Hello(ctx context.T, req *pb.HelloReq) (*pb.HelloResp, error) {
 	err := PPP()
-	return nil, nerrors.Trace(err)
+	return nil, errors.Trace(err)
 
 	msg := fmt.Sprintf("Hello %v.", req.Name)
 	return &pb.HelloResp{
@@ -38,5 +37,5 @@ func (s *Service) Hello(ctx context.Context, req *pb.HelloReq) (*pb.HelloResp, e
 // }
 
 func PPP() error {
-	return nerrors.Trace(errors.New("abc"))
+	return errors.Trace(errors.New("abc"))
 }

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"net"
 
+	"ninja/base/misc/context"
 	"ninja/base/misc/errors"
 
 	"github.com/soheilhy/cmux"
-	"golang.org/x/net/context"
 )
 
 type Server struct {
@@ -28,11 +28,16 @@ func (s *Server) Init(srv interface{}, srvName string, register func() error) er
 	return nil
 }
 
-func (s *Server) Run(ctx context.Context) error {
+func (s *Server) Run(ctx context.T) error {
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%v", s.Conf.Port))
 	if err != nil {
 		errors.Trace(err)
 	}
+
+	go func() {
+		<-ctx.Done()
+		ln.Close()
+	}()
 
 	m := cmux.New(ln)
 	// start grpc
@@ -49,11 +54,25 @@ func (s *Server) Run(ctx context.Context) error {
 		go s.WebServer.Serve(ln)
 	}
 
-	return m.Serve()
+	return handleLnError(m.Serve())
 }
 
 func (s *Server) Close() error {
-	return s.Conf.Close()
+	err := s.WebServer.Close()
+	err = s.Conf.Close()
+	return err
+}
+
+func handleLnError(err error) error {
+	if err, ok := err.(*net.OpError); ok {
+		if err.Op != "accept" {
+			return nil
+		}
+		if err.Err.Error() == "use of closed network connection" {
+			return nil
+		}
+	}
+	return err
 }
 
 // func (s *Server) RegisterServer(controller, grpcRegister interface{}) {
