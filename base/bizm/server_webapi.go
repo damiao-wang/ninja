@@ -1,6 +1,7 @@
 package bizm
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -12,16 +13,23 @@ import (
 	"time"
 
 	"ninja/base/mconf"
+	"ninja/base/misc/context"
 	"ninja/base/misc/log"
 
 	"github.com/gorilla/mux"
 	"github.com/urfave/negroni"
-	"golang.org/x/net/context"
 )
 
 type WebServer struct {
 	mux        *mux.Router
 	middleware []negroni.Handler
+	IsDownload bool
+}
+
+type Filer interface {
+	GetFilename() string
+	GetData() []byte
+	GetContentType() string
 }
 
 func (s *WebServer) AddMiddleware(m ...negroni.Handler) {
@@ -70,32 +78,78 @@ func (s *WebServer) GenHTTPHandler(fn interface{}) http.HandlerFunc {
 		panic("The 2th output param must be error.") // TODO
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-		requestBody, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			errorEncoder(err, w)
+	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := context.Dump()
+		params := reflect.New(fnType.In(1))
+		if err := s.webApiDecode(&ctx, req, params.Interface()); err != nil {
+			s.webApiHandleResp(&ctx, w, nil, err)
 			return
 		}
-		in := reflect.New(fnType.In(1))
-		err = json.Unmarshal(requestBody, in.Interface())
-		if err != nil {
-			errorEncoder(err, w)
-			return
-		}
+
 		vals := fnVal.Call([]reflect.Value{
-			reflect.ValueOf(context.Background()),
-			in.Elem(),
+			reflect.ValueOf(ctx),
+			params.Elem(),
 		})
-		if !vals[1].IsNil() {
-			errorEncoder(vals[1].Interface().(error), w)
-			return
+		err, ok := vals[1].Interface().(error)
+		if !ok {
+			err = nil
 		}
-		data, err := json.Marshal(vals[0].Interface())
+		s.webApiHandleResp(&ctx, w, vals[0].Interface(), err)
+	}
+}
+
+func (s *WebServer) webApiDecode(ctx *context.T, req *http.Request, arg interface{}) error {
+	// 创建并初始化context
+	h := ctx.InitRequestHeap(nil)
+	h.Start = time.Now()
+	ctx.SetRequest(req)
+
+	if s.IsDownload && req.Method == http.MethodGet {
+		// Get 的下载没有body
+		data := req.URL.Query().Get("_")
+		if err := json.Unmarshal([]byte(data), arg); err != nil {
+			return err
+		}
+	} else {
+		requestBody, err := ioutil.ReadAll(req.Body)
+		req.Body.Close()
 		if err != nil {
-			errorEncoder(err, w)
-			return
+			return err
 		}
-		w.Write(data)
+		err = json.Unmarshal(requestBody, arg)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *WebServer) webApiHandleResp(ctx *context.T, w http.ResponseWriter, resp interface{}, err error) {
+	if err != nil {
+		errorEncoder(err, w)
+		return
+	} else {
+		if c := ctx.GetResponseCookie(); c != nil {
+			for _, ck := range c {
+				http.SetCookie(w, ck)
+			}
+		}
+	}
+
+	if s.IsDownload && err == nil {
+		file := resp.(Filer)
+		filename := file.GetFilename()
+		if filename == "" {
+			panic("filename must be set")
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", "attachment; filename="+filename)
+		http.ServeContent(w, ctx.GetRequest(), filename, time.Now(), bytes.NewReader(file.GetData()))
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		ret, _ := json.Marshal(resp)
+		w.Write(ret)
 	}
 }
 
@@ -107,7 +161,7 @@ func (s *WebServer) AutoRouter(c interface{}) {
 	pathPrefix := fmt.Sprintf("/api/%s.%s", mconf.GetPkgName(), getServiceName(c))
 	subRouter := s.mux.PathPrefix(pathPrefix).Subrouter()
 	vf := reflect.ValueOf(c)
-	ctx := context.Background()
+	ctx := context.Dump()
 	for i := 0; i < vf.NumMethod(); i++ {
 		func(i int) {
 			subRouter.HandleFunc(fmt.Sprintf("/%v", vf.Type().Method(i).Name), generateHandler(ctx, vf.Method(i))).Methods("POST")
@@ -171,7 +225,7 @@ func getServiceName(s interface{}) string {
 func errorEncoder(err error, w http.ResponseWriter) {
 	w.WriteHeader(http.StatusInternalServerError)
 	json.NewEncoder(w).Encode(errorWrapper{Error: err.Error()})
-	log.NewEx(1).Errorf("err: %v", err)
+	log.NewEx(-1).Error(err)
 }
 
 type errorWrapper struct {

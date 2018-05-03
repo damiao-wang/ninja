@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 	"unsafe"
-	
+
 	"ninja/base/misc/stack"
 )
 
@@ -207,10 +207,12 @@ func AddField(err error, fields stack.Fields) error {
 	if !ok {
 		return &stackError{[]*stack.Frame{}, fields.Clone(), nil, nil, false, nil, err}
 	}
+	// fmt.Printf("len(stack): %v\n", len(s.stack))
 	if s.fields == nil {
 		s.fields = fields.Clone()
 	} else {
 		for k, v := range fields {
+			fmt.Println("k, v : ", k, v)
 			s.fields[k] = v
 		}
 	}

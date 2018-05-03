@@ -3,6 +3,7 @@ package blog;
 
 service Article {
     rpc Hello (HelloReq) returns (HelloResp);
+    rpc ExportInfo (ExportInfoReq) returns (ExportInfoResp);
 }
 
 message HelloReq {
@@ -11,4 +12,14 @@ message HelloReq {
 
 message HelloResp {
     string msg = 1;
+}
+
+message ExportInfoReq {
+
+}
+
+message ExportInfoResp {
+    string contentType = 1;
+    bytes data = 2;
+    string filename = 3;
 }
