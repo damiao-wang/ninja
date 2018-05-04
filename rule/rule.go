@@ -1,134 +1,102 @@
 package rule
 
 import (
-	"fmt"
-	"sort"
+	"encoding/json"
+	"errors"
 	"strings"
-	"sync"
 
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/jinzhu/gorm"
+	"github.com/garyburd/redigo/redis"
 )
 
-type ruleMap struct {
-	sync.RWMutex
-	keyA     []string
-	keyB     []string
-	mapRuleA sync.Map
-	mapRuleB sync.Map
-	chose    choseInt
+type TblRouteCfg struct {
+	Id         int32
+	Proi       int32
+	ProdCd     string `gorm:"default:'*'"`
+	TranCd     string `gorm:"default:'*'"`
+	AppId      string `gorm:"default:'*'"`
+	Status     string `gorm:"default:'*'"`
+	IssInsGrp  string `gorm:"default:'*'"`
+	IssInsCd   string `gorm:"default:'*'"`
+	CardBin    string `gorm:"default:'*'"`
+	CardClass  string `gorm:"default:'*'"`
+	AmtL       string `gorm:"default:'*'"`
+	AmtH       string `gorm:"default:'*'"`
+	DateB      string `gorm:"default:'*'"`
+	DateE      string `gorm:"default:'*'"`
+	TimeB      string `gorm:"default:'*'"`
+	TimeE      string `gorm:"default:'*'"`
+	ObjServer  string `gorm:"default:'*'"`
+	ObjMchntCd string
+	Use        string `gorm:"default:'1'"`
 }
 
-type choseInt int
-
-const (
-	choseAMap choseInt = iota
-	choseBMap
-)
-
-var rm ruleMap
-
-type Rule struct {
-	Id       int32
-	Weight   string
-	ObjInsCd string
-	TranTp   string
-	ProdCd   string
-	TrnCd    string
-	BizCd    string
-	MchntGrp string
-	MchntCD  string
-}
-
-// 匹配复合条件的rule
-func GetRule(cond *Rule) (int32, bool) {
-	keys, rmap := rm.get()
-	for _, key := range keys {
-		v, ok := rmap.Load(key)
-		if !ok {
-			continue
-		}
-		if isMatch(cond, v.(*Rule)) {
-			return v.(*Rule).Id, true
-		}
-	}
-	return 0, false
-}
-
-// 加载规则到redis中
-func StoreRule(db *gorm.DB) error {
-	// 获取暂时不用的缓存
-	rows, err := db.Model(&Rule{}).Select("id, weight, obj_ins_cd, tran_tp, prod_cd, trn_cd, biz_cd, mchnt_grp, mchnt_cd").Rows()
+func GetRouteCfg(conn redis.Conn, key string, cond *TblRouteCfg) (*TblRouteCfg, error) {
+	reply, err := redis.ByteSlices(conn.Do("ZRANGE", key, 0, -1))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer rows.Close()
-
-	keys := make([]string, 0)
-	var rmap sync.Map
-	for rows.Next() {
-		var item Rule
-		if err := db.ScanRows(rows, &item); err != nil {
-			return err
+	for _, v := range reply {
+		var item *TblRouteCfg
+		if err := json.Unmarshal(v, &item); err != nil {
+			return nil, err
 		}
-		keyId := fmt.Sprintf("%v_%v", item.Weight, item.Id)
-		keys = append(keys, keyId)
-		rmap.Store(keyId, &item)
+		if isMatch(cond, item) {
+			return item, nil
+		}
 	}
-	sort.Strings(keys)
-	rm.set(keys, rmap)
-	return nil
+	return nil, errors.New("Find nothing!")
 }
 
-func (r *ruleMap) set(keys []string, rmap sync.Map) {
-	r.Lock()
-	defer r.Unlock()
-
-	if r.chose == choseAMap {
-		r.chose = choseBMap
-		r.keyB = keys
-		r.mapRuleB = rmap
-	} else {
-		r.chose = choseAMap
-		r.keyA = keys
-		r.mapRuleA = rmap
-	}
-}
-
-func (r *ruleMap) get() ([]string, sync.Map) {
-	r.RLock()
-	defer r.RUnlock()
-
-	key := make([]string, 0, len(r.keyA))
-	if r.chose == choseAMap {
-		key = append(key, r.keyA...)
-		return key, r.mapRuleA
-	}
-
-	key = append(key, r.keyB...)
-	return key, r.mapRuleB
-}
-
-func isMatch(cond, val *Rule) bool {
-	if !isMemMatch(cond.ObjInsCd, val.ObjInsCd) {
-		return false
-	}
-	if !isMemMatch(cond.TranTp, val.TranTp) {
-		return false
-	}
+func isMatch(cond, val *TblRouteCfg) bool {
 	if !isMemMatch(cond.ProdCd, val.ProdCd) {
 		return false
 	}
-	if !isMemMatch(cond.TrnCd, val.TrnCd) {
+	if !isMemMatch(cond.TranCd, val.TranCd) {
 		return false
 	}
-	if !isMemMatch(cond.BizCd, val.BizCd) {
+	if !isMemMatch(cond.AppId, val.AppId) {
 		return false
 	}
-	if !isMemMatch(cond.MchntGrp, val.MchntGrp) {
+	if !isMemMatch(cond.Status, val.Status) {
 		return false
 	}
-	if !isMemMatch(cond.MchntCD, val.MchntCD) {
+	if !isMemMatch(cond.IssInsGrp, val.IssInsGrp) {
+		return false
+	}
+	if !isMemMatch(cond.IssInsCd, val.IssInsCd) {
+		return false
+	}
+	if !isMemMatch(cond.CardBin, val.CardBin) {
+		return false
+	}
+	if !isMemMatch(cond.CardClass, val.CardClass) {
+		return false
+	}
+	if !isMemMatch(cond.AmtL, val.AmtL) {
+		return false
+	}
+	if !isMemMatch(cond.AmtH, val.AmtH) {
+		return false
+	}
+	if !isMemMatch(cond.DateB, val.DateB) {
+		return false
+	}
+	if !isMemMatch(cond.DateE, val.DateE) {
+		return false
+	}
+	if !isMemMatch(cond.TimeB, val.TimeB) {
+		return false
+	}
+	if !isMemMatch(cond.TimeE, val.TimeE) {
+		return false
+	}
+	if !isMemMatch(cond.ObjServer, val.ObjServer) {
+		return false
+	}
+	if !isMemMatch(cond.ObjMchntCd, val.ObjMchntCd) {
+		return false
+	}
+	if !isMemMatch(cond.Use, val.Use) {
 		return false
 	}
 	return true
