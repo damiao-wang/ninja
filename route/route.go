@@ -1,12 +1,31 @@
-package rule
+package route
 
 import (
-	"encoding/json"
 	"errors"
+	"fmt"
+	"sort"
 	"strings"
+	"sync"
 
 	"github.com/garyburd/redigo/redis"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/jinzhu/gorm"
 )
+
+type routeInfo struct {
+	sync.RWMutex
+	conn   redis.Conn
+	routeA []*TblRouteCfg
+	routeB []*TblRouteCfg
+}
+
+const (
+	routeKey  = "tbl_route_cfg_key"
+	routeKeyA = "tbl_route_cfg_key_a"
+	routeKeyB = "tbl_route_cfg_key_b"
+)
+
+var rInfo routeInfo
 
 type TblRouteCfg struct {
 	Id         int32
@@ -30,21 +49,100 @@ type TblRouteCfg struct {
 	Use        string `gorm:"default:'1'"`
 }
 
-func GetRouteCfg(conn redis.Conn, key string, cond *TblRouteCfg) (*TblRouteCfg, error) {
-	reply, err := redis.ByteSlices(conn.Do("ZRANGE", key, 0, -1))
+type routeSlice []*TblRouteCfg
+
+func (r routeSlice) Len() int {
+	return len(r)
+}
+
+func (r routeSlice) Less(i, j int) bool {
+	if r[i].Proi == r[j].Proi {
+		fmt.Println("In..")
+		return r[i].Id < r[j].Id
+	}
+
+	return r[i].Proi < r[j].Proi
+}
+
+func (r routeSlice) Swap(i, j int) {
+	r[i], r[j] = r[j], r[i]
+}
+
+// 匹配复合条件的rule
+func GetRule(cond *TblRouteCfg) (int32, error) {
+	routes, err := rInfo.get()
+	if err != nil {
+		return 0, err
+	}
+	for _, v := range routes {
+		if isMatch(cond, v) {
+			return v.Id, nil
+		}
+	}
+	return 0, errors.New("Find nothing!")
+}
+
+// 加载配置到redis中
+func LoadRule(db *gorm.DB) error {
+	// 获取暂时不用的缓存
+	var routes []*TblRouteCfg
+	if err := db.Find(&routes).Error; err != nil {
+		return err
+	}
+
+	sort.Sort(routeSlice(routes))
+	return rInfo.set(routes)
+}
+
+func InitRedis(addr string) error {
+	conn, err := redis.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+	rInfo.conn = conn
+	return nil
+}
+
+func (r *routeInfo) set(routes []*TblRouteCfg) error {
+	key, err := redis.String(r.conn.Do("GET", routeKey))
+	if err != nil {
+		return err
+	}
+	var anotherKey string
+	r.Lock()
+	if routeKeyA == key {
+		anotherKey = routeKeyB
+		r.routeB = routes
+	} else {
+		anotherKey = routeKeyA
+		r.routeA = routes
+	}
+	r.Unlock()
+
+	_, err = r.conn.Do("SET", routeKey, anotherKey)
+	return err
+}
+
+func (r *routeInfo) get() ([]*TblRouteCfg, error) {
+	key, err := redis.String(r.conn.Do("GET", routeKey))
 	if err != nil {
 		return nil, err
 	}
-	for _, v := range reply {
-		var item *TblRouteCfg
-		if err := json.Unmarshal(v, &item); err != nil {
-			return nil, err
-		}
-		if isMatch(cond, item) {
-			return item, nil
-		}
+
+	routes := make([]*TblRouteCfg, 0, len(r.routeA))
+	r.RLock()
+	if routeKeyA == key {
+		routes = append(routes, r.routeA...)
+	} else {
+		routes = append(routes, r.routeB...)
 	}
-	return nil, errors.New("Find nothing!")
+	r.RUnlock()
+
+	return routes, nil
+}
+
+func (TblRouteCfg) TableName() string {
+	return "tbl_route_cfg"
 }
 
 func isMatch(cond, val *TblRouteCfg) bool {
