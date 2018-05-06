@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 	_ "github.com/go-sql-driver/mysql"
@@ -14,7 +15,6 @@ import (
 
 type routeInfo struct {
 	sync.RWMutex
-	conn   redis.Conn
 	routeA []*TblRouteCfg
 	routeB []*TblRouteCfg
 }
@@ -25,7 +25,10 @@ const (
 	routeKeyB = "tbl_route_cfg_key_b"
 )
 
-var rInfo routeInfo
+var (
+	rInfo     routeInfo
+	redisPool *redis.Pool
+)
 
 type TblRouteCfg struct {
 	Id         int32
@@ -94,17 +97,18 @@ func LoadRule(db *gorm.DB) error {
 	return rInfo.set(routes)
 }
 
-func InitRedis(addr string) error {
-	conn, err := redis.Dial("tcp", addr)
-	if err != nil {
-		return err
+func InitRedis(addr string) {
+	redisPool = &redis.Pool{
+		MaxIdle:     8,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", addr)
+		},
 	}
-	rInfo.conn = conn
-	return nil
 }
 
 func (r *routeInfo) set(routes []*TblRouteCfg) error {
-	key, err := redis.String(r.conn.Do("GET", routeKey))
+	key, err := getRouteKey()
 	if err != nil {
 		return err
 	}
@@ -119,16 +123,14 @@ func (r *routeInfo) set(routes []*TblRouteCfg) error {
 	}
 	r.Unlock()
 
-	_, err = r.conn.Do("SET", routeKey, anotherKey)
-	return err
+	return setRouteKey(anotherKey)
 }
 
 func (r *routeInfo) get() ([]*TblRouteCfg, error) {
-	key, err := redis.String(r.conn.Do("GET", routeKey))
+	key, err := getRouteKey()
 	if err != nil {
 		return nil, err
 	}
-
 	routes := make([]*TblRouteCfg, 0, len(r.routeA))
 	r.RLock()
 	if routeKeyA == key {
@@ -207,4 +209,17 @@ func isMemMatch(src, prefix string) bool {
 		}
 	}
 	return true
+}
+
+func getRouteKey() (string, error) {
+	conn := redisPool.Get()
+	defer conn.Close()
+	return redis.String(conn.Do("GET", routeKey))
+}
+
+func setRouteKey(val string) error {
+	conn := redisPool.Get()
+	defer conn.Close()
+	_, err := conn.Do("SET", routeKey, val)
+	return err
 }
