@@ -1,5 +1,5 @@
 syntax = "proto3";
-package route2;
+package route;
 
 message TblRouteCfg {
     int32 Id = 1;

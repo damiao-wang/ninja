@@ -1,4 +1,4 @@
-package route2
+package route
 
 import (
 	"log"
