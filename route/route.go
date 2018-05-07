@@ -1,11 +1,9 @@
 package route
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
-	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -13,22 +11,13 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-type routeInfo struct {
-	sync.RWMutex
-	routeA []*TblRouteCfg
-	routeB []*TblRouteCfg
-}
-
 const (
 	routeKey  = "tbl_route_cfg_key"
 	routeKeyA = "tbl_route_cfg_key_a"
 	routeKeyB = "tbl_route_cfg_key_b"
 )
 
-var (
-	rInfo     routeInfo
-	redisPool *redis.Pool
-)
+var redisPool *redis.Pool
 
 type TblRouteCfg struct {
 	Id         int32
@@ -52,49 +41,33 @@ type TblRouteCfg struct {
 	Use        string `gorm:"default:'1'"`
 }
 
-type routeSlice []*TblRouteCfg
-
-func (r routeSlice) Len() int {
-	return len(r)
-}
-
-func (r routeSlice) Less(i, j int) bool {
-	if r[i].Proi == r[j].Proi {
-		fmt.Println("In..")
-		return r[i].Id < r[j].Id
-	}
-
-	return r[i].Proi < r[j].Proi
-}
-
-func (r routeSlice) Swap(i, j int) {
-	r[i], r[j] = r[j], r[i]
-}
-
 // 匹配复合条件的rule
-func GetRule(cond *TblRouteCfg) (int32, error) {
-	routes, err := rInfo.get()
+func GetRoute(cond *TblRouteCfg) (*TblRouteCfg, error) {
+	routes, err := getRoutes()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	for _, v := range routes {
-		if isMatch(cond, v) {
-			return v.Id, nil
+		var item *TblRouteCfg
+		if err := json.Unmarshal(v, &item); err != nil {
+			return nil, err
+		}
+		if isMatch(cond, item) {
+			return item, nil
 		}
 	}
-	return 0, errors.New("Find nothing!")
+	return nil, errors.New("Find nothing!")
 }
 
 // 加载配置到redis中
-func LoadRule(db *gorm.DB) error {
+func LoadRoute(db *gorm.DB) error {
 	// 获取暂时不用的缓存
 	var routes []*TblRouteCfg
 	if err := db.Find(&routes).Error; err != nil {
 		return err
 	}
 
-	sort.Sort(routeSlice(routes))
-	return rInfo.set(routes)
+	return setRoutes(routes)
 }
 
 func InitRedis(addr string) {
@@ -107,40 +80,51 @@ func InitRedis(addr string) {
 	}
 }
 
-func (r *routeInfo) set(routes []*TblRouteCfg) error {
-	key, err := getRouteKey()
+func setRoutes(routes []*TblRouteCfg) error {
+	conn := redisPool.Get()
+	defer conn.Close()
+
+	key, err := redis.String(conn.Do("GET", routeKey))
 	if err != nil {
 		return err
 	}
+
 	var anotherKey string
-	r.Lock()
 	if routeKeyA == key {
 		anotherKey = routeKeyB
-		r.routeB = routes
 	} else {
 		anotherKey = routeKeyA
-		r.routeA = routes
 	}
-	r.Unlock()
 
-	return setRouteKey(anotherKey)
+	if err := conn.Send("DEL", anotherKey, anotherKey); err != nil {
+		return err
+	}
+	for _, v := range routes {
+		item, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		if err := conn.Send("ZADD", anotherKey, v.Proi, item); err != nil {
+			return err
+		}
+	}
+	if err := conn.Send("SET", routeKey, anotherKey); err != nil {
+		return err
+	}
+	return conn.Flush()
+
 }
 
-func (r *routeInfo) get() ([]*TblRouteCfg, error) {
-	key, err := getRouteKey()
+func getRoutes() ([][]byte, error) {
+	conn := redisPool.Get()
+	defer conn.Close()
+
+	key, err := redis.String(conn.Do("GET", routeKey))
 	if err != nil {
 		return nil, err
 	}
-	routes := make([]*TblRouteCfg, 0, len(r.routeA))
-	r.RLock()
-	if routeKeyA == key {
-		routes = append(routes, r.routeA...)
-	} else {
-		routes = append(routes, r.routeB...)
-	}
-	r.RUnlock()
 
-	return routes, nil
+	return redis.ByteSlices(conn.Do("ZRANGE", key, 0, -1))
 }
 
 func (TblRouteCfg) TableName() string {
@@ -209,17 +193,4 @@ func isMemMatch(src, prefix string) bool {
 		}
 	}
 	return true
-}
-
-func getRouteKey() (string, error) {
-	conn := redisPool.Get()
-	defer conn.Close()
-	return redis.String(conn.Do("GET", routeKey))
-}
-
-func setRouteKey(val string) error {
-	conn := redisPool.Get()
-	defer conn.Close()
-	_, err := conn.Do("SET", routeKey, val)
-	return err
 }

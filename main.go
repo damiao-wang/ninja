@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"ninja/base/misc/log"
+	"ninja/route"
+
 	"github.com/garyburd/redigo/redis"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -12,9 +15,27 @@ var pool *redis.Pool
 
 func main() {
 	// db, _ := gorm.Open("mysql", "root:wang123456@/hyjr?charset=utf8&parseTime=True&loc=Local")
-	// err := rule.StoreRoute(db, conn, "rule2")
-	// fmt.Println(err)
+	// fmt.Println(db.AutoMigrate(&model.TblRouteCfg{}).Error)
+	route.InitRedis("127.0.0.1:6379")
+	// if err := route.LoadRoute(db); err != nil {
+	// 	log.Error(err)
+	// 	return
+	// }
+	for {
+		resp, err := route.GetRoute(&route.TblRouteCfg{
+			ProdCd:    "123456",
+			CardClass: "1",
+		})
+		if err != nil {
+			log.Error(err)
+		} else {
+			fmt.Println("resp: ", resp)
+		}
+		time.Sleep(15 * time.Second)
+	}
+}
 
+func testRdis() {
 	newPool()
 	conn1 := pool.Get()
 	fmt.Printf("active:%v, ide: %v\n ", pool.Stats().ActiveCount, pool.Stats().IdleCount)
@@ -27,7 +48,6 @@ func main() {
 	_, err := conn.Do("PING")
 	fmt.Println("err: ", err)
 }
-
 func newPool() {
 	pool = &redis.Pool{
 		MaxIdle:     3,
@@ -36,8 +56,4 @@ func newPool() {
 			return redis.Dial("tcp", "127.0.0.1:6379")
 		},
 	}
-}
-
-func get() {
-
 }
