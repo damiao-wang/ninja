@@ -96,22 +96,18 @@ func setRoutes(routes []*TblRouteCfg) error {
 		anotherKey = routeKeyA
 	}
 
-	if err := conn.Send("DEL", anotherKey, anotherKey); err != nil {
-		return err
-	}
+	conn.Send("DEL", anotherKey, anotherKey)
 	for _, v := range routes {
 		item, err := json.Marshal(v)
 		if err != nil {
 			return err
 		}
-		if err := conn.Send("ZADD", anotherKey, v.Proi, item); err != nil {
-			return err
-		}
+		conn.Send("ZADD", anotherKey, v.Proi, item)
 	}
-	if err := conn.Send("SET", routeKey, anotherKey); err != nil {
-		return err
-	}
-	return conn.Flush()
+	conn.Send("SET", routeKey, anotherKey)
+	conn.Flush()
+	_, err = conn.Receive()
+	return err
 
 }
 

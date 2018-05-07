@@ -1,0 +1,24 @@
+syntax = "proto3";
+package route2;
+
+message TblRouteCfg {
+    int32 Id = 1;
+    int32 Proi = 2;
+    string ProdCd = 3;
+    string TranCd = 4;
+    string AppId = 5;
+    string Status = 6;
+    string IssInsGrp = 7;
+    string IssInsCd = 8;
+    string CardBin = 9;
+    string CardClass = 10;
+    string AmtL = 11;
+    string AmtH = 12;
+    string DateB = 13;
+    string DateE = 14;
+    string TimeB = 15;
+    string TimeE = 16;
+    string ObjServer = 17;
+    string ObjMchntCd = 18;
+    string Use = 19;
+}

@@ -1,4 +1,4 @@
-package rule2
+package route2
 
 import (
 	"errors"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang/protobuf/proto"
 	"github.com/jinzhu/gorm"
 )
 
@@ -18,38 +19,16 @@ const (
 
 var redisPool *redis.Pool
 
-type TblRouteCfg struct {
-	Id         int32
-	Proi       int32
-	ProdCd     string `gorm:"default:'*'"`
-	TranCd     string `gorm:"default:'*'"`
-	AppId      string `gorm:"default:'*'"`
-	Status     string `gorm:"default:'*'"`
-	IssInsGrp  string `gorm:"default:'*'"`
-	IssInsCd   string `gorm:"default:'*'"`
-	CardBin    string `gorm:"default:'*'"`
-	CardClass  string `gorm:"default:'*'"`
-	AmtL       string `gorm:"default:'*'"`
-	AmtH       string `gorm:"default:'*'"`
-	DateB      string `gorm:"default:'*'"`
-	DateE      string `gorm:"default:'*'"`
-	TimeB      string `gorm:"default:'*'"`
-	TimeE      string `gorm:"default:'*'"`
-	ObjServer  string `gorm:"default:'*'"`
-	ObjMchntCd string
-	Use        string `gorm:"default:'1'"`
-}
-
 // 匹配复合条件的rule
 func GetRoute(cond *TblRouteCfg) (*TblRouteCfg, error) {
 	routes, err := getRoutes()
 	if err != nil {
 		return nil, err
 	}
-	for _, v := range routes {
-		item, ok := v.(*TblRouteCfg)
-		if !ok {
-			return nil, errors.New("err")
+	for _, buf := range routes {
+		item := &TblRouteCfg{}
+		if err := proto.Unmarshal(buf, item); err != nil {
+			return nil, err
 		}
 		if isMatch(cond, item) {
 			return item, nil
@@ -62,7 +41,7 @@ func GetRoute(cond *TblRouteCfg) (*TblRouteCfg, error) {
 func LoadRoute(db *gorm.DB) error {
 	// 获取暂时不用的缓存
 	var routes []*TblRouteCfg
-	if err := db.Find(&routes).Error; err != nil {
+	if err := db.Table("tbl_route_cfg").Find(&routes).Error; err != nil {
 		return err
 	}
 
@@ -97,7 +76,11 @@ func setRoutes(routes []*TblRouteCfg) error {
 
 	conn.Send("DEL", anotherKey, anotherKey)
 	for _, v := range routes {
-		conn.Send("ZADD", anotherKey, v.Proi, v)
+		buf, err := proto.Marshal(v)
+		if err != nil {
+			return err
+		}
+		conn.Send("ZADD", anotherKey, v.Proi, buf)
 	}
 	conn.Send("SET", routeKey, anotherKey)
 	conn.Flush()
@@ -106,7 +89,7 @@ func setRoutes(routes []*TblRouteCfg) error {
 
 }
 
-func getRoutes() ([]interface{}, error) {
+func getRoutes() ([][]byte, error) {
 	conn := redisPool.Get()
 	defer conn.Close()
 
@@ -114,12 +97,7 @@ func getRoutes() ([]interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return redis.Values(conn.Do("ZRANGE", key, 0, -1))
-}
-
-func (TblRouteCfg) TableName() string {
-	return "tbl_route_cfg"
+	return redis.ByteSlices(conn.Do("ZRANGE", key, 0, -1))
 }
 
 func isMatch(cond, val *TblRouteCfg) bool {

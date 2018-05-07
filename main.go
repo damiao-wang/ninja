@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"ninja/base/misc/log"
-	"ninja/route"
+	"ninja/rule2"
 
 	"github.com/garyburd/redigo/redis"
 	_ "github.com/go-sql-driver/mysql"
@@ -16,13 +16,13 @@ var pool *redis.Pool
 func main() {
 	// db, _ := gorm.Open("mysql", "root:wang123456@/hyjr?charset=utf8&parseTime=True&loc=Local")
 	// fmt.Println(db.AutoMigrate(&model.TblRouteCfg{}).Error)
-	route.InitRedis("127.0.0.1:6379")
-	// if err := route.LoadRoute(db); err != nil {
+	rule2.InitRedis("127.0.0.1:6379")
+	// if err := route2.LoadRoute(db); err != nil {
 	// 	log.Error(err)
 	// 	return
 	// }
 	for {
-		resp, err := route.GetRoute(&route.TblRouteCfg{
+		resp, err := rule2.GetRoute(&rule2.TblRouteCfg{
 			ProdCd:    "123456",
 			CardClass: "1",
 		})
