@@ -75,6 +75,9 @@ func (p *redisPool) setRoutes(routes []*TblRouteCfg) error {
 	conn := p.pool.Get()
 	defer conn.Close()
 
+	if isE, _ := redis.Bool(conn.Do("EXISTS", routeKey)); !isE {
+		return set(routes, routeKeyA, conn)
+	}
 	key, err := redis.String(conn.Do("GET", routeKey))
 	if err != nil {
 		return err
@@ -87,17 +90,10 @@ func (p *redisPool) setRoutes(routes []*TblRouteCfg) error {
 		anotherKey = routeKeyA
 	}
 
-	conn.Send("DEL", anotherKey, anotherKey)
-	for _, v := range routes {
-		buf, err := proto.Marshal(v)
-		if err != nil {
-			return err
-		}
-		conn.Send("ZADD", anotherKey, v.Proi, buf)
+	if err := set(routes, anotherKey, conn); err != nil {
+		return err
 	}
-	conn.Send("SET", routeKey, anotherKey)
-	conn.Flush()
-	_, err = conn.Receive()
+
 	return err
 
 }
@@ -111,6 +107,21 @@ func (p *redisPool) getRoutes() ([][]byte, error) {
 		return nil, err
 	}
 	return redis.ByteSlices(conn.Do("ZRANGE", key, 0, -1))
+}
+
+func set(routes []*TblRouteCfg, key string, conn redis.Conn) error {
+	conn.Send("DEL", key, key)
+	for _, v := range routes {
+		buf, err := proto.Marshal(v)
+		if err != nil {
+			return err
+		}
+		conn.Send("ZADD", key, v.Proi, buf)
+	}
+	conn.Send("SET", routeKey, key)
+	conn.Flush()
+	_, err := conn.Receive()
+	return err
 }
 
 func isMatch(cond, val *TblRouteCfg) bool {
