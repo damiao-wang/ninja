@@ -108,7 +108,9 @@ func (s *WebServer) webApiDecode(ctx *context.T, req *http.Request, arg interfac
 	h.Start = time.Now()
 	ctx.SetRequest(req)
 
-	if isDownload && req.Method == http.MethodGet {
+	if isUpload(req.Header) {
+		return s.multipartDecode(ctx, req, arg)
+	} else if isDownload && req.Method == http.MethodGet {
 		// Get 的下载没有body
 		data := req.URL.Query().Get("_")
 		if err := json.Unmarshal([]byte(data), arg); err != nil {
@@ -157,6 +159,29 @@ func (s *WebServer) webApiHandleResp(ctx *context.T, w http.ResponseWriter, resp
 	}
 }
 
+func (s *WebServer) multipartDecode(ctx *context.T, req *http.Request, arg interface{}) error {
+	file, header, err := req.FormFile("uploadFile")
+	if err != nil {
+		return err
+	}
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return err
+	}
+	argVal := struct {
+		Filename string
+		Data     []byte
+	}{
+		Filename: header.Filename,
+		Data:     data,
+	}
+	body, err := json.Marshal(argVal)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, arg)
+}
+
 func (s *WebServer) AutoRouter(c interface{}) {
 	if s.mux == nil {
 		s.mux = mux.NewRouter()
@@ -177,6 +202,14 @@ func (s *WebServer) Close() error {
 	err := s.srv.Shutdown(nil)
 	grace.DoneTask()
 	return errors.Trace(err)
+}
+
+func isUpload(header http.Header) bool {
+	contentType := header.Get("Content-Type")
+	if strings.Contains(contentType, "multipart/form-data") {
+		return true
+	}
+	return false
 }
 
 func getServiceName(s interface{}) string {

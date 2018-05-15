@@ -3,10 +3,12 @@ package article
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"ninja/base/bizm"
 	"ninja/base/misc/context"
 	"ninja/base/misc/errors"
 	pb "ninja/blog/rpc/blog"
+	"os"
 
 	"github.com/tealeg/xlsx"
 )
@@ -51,4 +53,19 @@ func (s *Service) ExportInfo(ctx context.T, req *pb.ExportInfoReq) (*pb.ExportIn
 		Filename: "Info.xlsx",
 		Data:     buf.Bytes(),
 	}, nil
+}
+
+func (s *Service) Upload(ctx context.T, req *pb.UploadReq) (*pb.UploadResp, error) {
+	file, err := os.Create(req.Filename)
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	defer file.Close()
+
+	buf := bytes.NewBuffer(req.Data)
+	if _, err := io.Copy(file, buf); err != nil {
+		return nil, errors.Trace(err)
+	}
+
+	return &pb.UploadResp{}, nil
 }
