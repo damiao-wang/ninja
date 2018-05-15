@@ -3,7 +3,6 @@ package blog;
 
 service Article {
     rpc Hello (HelloReq) returns (HelloResp);
-    rpc ExportInfo (ExportInfoReq) returns (ExportInfoResp);
 }
 
 message HelloReq {
@@ -15,7 +14,7 @@ message HelloResp {
 }
 
 message ExportInfoReq {
-
+    string name = 1;
 }
 
 message ExportInfoResp {

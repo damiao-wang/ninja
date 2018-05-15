@@ -26,7 +26,6 @@ type WebServer struct {
 	srv        *http.Server
 	mux        *mux.Router
 	middleware []negroni.Handler
-	IsDownload bool
 }
 
 type Filer interface {
@@ -66,7 +65,7 @@ func (s *WebServer) RegisterRouter(mux *mux.Router) {
 	}
 }
 
-func (s *WebServer) GenHTTPHandler(fn interface{}) http.HandlerFunc {
+func (s *WebServer) GenHTTPHandler(fn interface{}, isDownload bool) http.HandlerFunc {
 	fnVal := reflect.ValueOf(fn)
 	fnType := fnVal.Type()
 	if fnType.Kind() != reflect.Func {
@@ -86,8 +85,8 @@ func (s *WebServer) GenHTTPHandler(fn interface{}) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := context.Dump()
 		params := reflect.New(fnType.In(1))
-		if err := s.webApiDecode(&ctx, req, params.Interface()); err != nil {
-			s.webApiHandleResp(&ctx, w, nil, err)
+		if err := s.webApiDecode(&ctx, req, params.Interface(), isDownload); err != nil {
+			s.webApiHandleResp(&ctx, w, nil, isDownload, err)
 			return
 		}
 
@@ -99,17 +98,17 @@ func (s *WebServer) GenHTTPHandler(fn interface{}) http.HandlerFunc {
 		if !ok {
 			err = nil
 		}
-		s.webApiHandleResp(&ctx, w, vals[0].Interface(), err)
+		s.webApiHandleResp(&ctx, w, vals[0].Interface(), isDownload, err)
 	}
 }
 
-func (s *WebServer) webApiDecode(ctx *context.T, req *http.Request, arg interface{}) error {
+func (s *WebServer) webApiDecode(ctx *context.T, req *http.Request, arg interface{}, isDownload bool) error {
 	// 创建并初始化context
 	h := ctx.InitRequestHeap(nil)
 	h.Start = time.Now()
 	ctx.SetRequest(req)
 
-	if s.IsDownload && req.Method == http.MethodGet {
+	if isDownload && req.Method == http.MethodGet {
 		// Get 的下载没有body
 		data := req.URL.Query().Get("_")
 		if err := json.Unmarshal([]byte(data), arg); err != nil {
@@ -130,7 +129,7 @@ func (s *WebServer) webApiDecode(ctx *context.T, req *http.Request, arg interfac
 	return nil
 }
 
-func (s *WebServer) webApiHandleResp(ctx *context.T, w http.ResponseWriter, resp interface{}, err error) {
+func (s *WebServer) webApiHandleResp(ctx *context.T, w http.ResponseWriter, resp interface{}, isDownload bool, err error) {
 	if err != nil {
 		errorEncoder(err, w)
 		return
@@ -142,7 +141,7 @@ func (s *WebServer) webApiHandleResp(ctx *context.T, w http.ResponseWriter, resp
 		}
 	}
 
-	if s.IsDownload && err == nil {
+	if isDownload && err == nil {
 		file := resp.(Filer)
 		filename := file.GetFilename()
 		if filename == "" {

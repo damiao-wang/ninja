@@ -1,11 +1,14 @@
 package article
 
 import (
+	"bytes"
 	"fmt"
 	"ninja/base/bizm"
 	"ninja/base/misc/context"
 	"ninja/base/misc/errors"
 	pb "ninja/blog/rpc/blog"
+
+	"github.com/tealeg/xlsx"
 )
 
 type Service struct {
@@ -23,19 +26,29 @@ func (s *Service) Register() error {
 }
 
 func (s *Service) Hello(ctx context.T, req *pb.HelloReq) (*pb.HelloResp, error) {
-	err := PPP()
-	return nil, errors.Trace(err)
-
 	msg := fmt.Sprintf("Hello %v.", req.Name)
 	return &pb.HelloResp{
 		Msg: msg,
 	}, nil
 }
 
-// func init() {
-// 	raven.SetDSN("https://1c115aaf0b2048f485936409b03ce0f7:c6480693facf40d6b89c28711fb363b9@sentry.io/304312")
-// }
+func (s *Service) ExportInfo(ctx context.T, req *pb.ExportInfoReq) (*pb.ExportInfoResp, error) {
+	w := xlsx.NewFile()
+	sheet, err := w.AddSheet("sheet")
+	if err != nil {
+		return nil, errors.Trace(err)
+	}
+	row := sheet.AddRow()
+	row.AddCell().SetString("ID")
+	row.AddCell().SetString("NAME")
+	row = sheet.AddRow()
+	row.AddCell().SetInt(1)
+	row.AddCell().SetString(req.Name)
 
-func PPP() error {
-	return errors.Trace(errors.New("abc"))
+	buf := bytes.NewBuffer(nil)
+	w.Write(buf)
+	return &pb.ExportInfoResp{
+		Filename: "Info.xlsx",
+		Data:     buf.Bytes(),
+	}, nil
 }
