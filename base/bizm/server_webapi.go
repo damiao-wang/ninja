@@ -164,6 +164,8 @@ func (s *WebServer) multipartDecode(ctx *context.T, req *http.Request, arg inter
 	if err != nil {
 		return err
 	}
+	defer file.Close()
+
 	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		return err
